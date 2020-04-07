@@ -1,8 +1,14 @@
+/*  Robotics Aerial Robot Course (NCRL)
+ *  Usage : Eigen, TF, ROS
+ *  Target : Dead Reckoning with IMU (Mid Point Integration)
+ */
+
 #include <ros/ros.h>
 #include <sensor_msgs/Imu.h>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <nav_msgs/Path.h>
+#include <tf/transform_broadcaster.h>
 
 // declare publisher
 ros::Publisher pub_pos;
@@ -17,8 +23,20 @@ Eigen::Vector3d acc0, gyr0;
 Eigen::Vector3d position(0, 0, 0), velocity(0, 0, 0);
 Eigen::Quaterniond orientation(1, 0, 0, 0);
 
+void broadCastTF(geometry_msgs::PoseStamped pose){
+    static tf::TransformBroadcaster br;
+    tf::Transform TF_pose;
+    TF_pose.setOrigin(tf::Vector3(pose.pose.position.x,
+                                  pose.pose.position.y,
+                                  pose.pose.position.z));
+    TF_pose.setRotation(tf::Quaternion(pose.pose.orientation.x,
+                                       pose.pose.orientation.y,
+                                       pose.pose.orientation.z,
+                                       pose.pose.orientation.w));
+    br.sendTransform(tf::StampedTransform(TF_pose, pose.header.stamp.now(), "base_link", "imu"));
+}
+
 void cb_imu(const sensor_msgs::Imu::ConstPtr& msg){
-    sensor_msgs::Imu imu = *msg;
     geometry_msgs::PoseStamped pose;
     pose.header = msg->header;
 
@@ -66,18 +84,19 @@ void cb_imu(const sensor_msgs::Imu::ConstPtr& msg){
     // publish msgs
     result.header = msg->header;
     result.poses.push_back(pose);
+    broadCastTF(pose);
     pub_pos.publish(result);
 }
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "mid_point_integration");
-  ros::NodeHandle nh;
+    ros::init(argc, argv, "mid_point_integration");
+    ros::NodeHandle nh;
 
-  ROS_INFO_STREAM("My Student ID is : " << "0XXXXXX");
+    ROS_INFO_STREAM("My Student ID is : " << "0XXXXXX");
 
-  ros::Subscriber sub_imu = nh.subscribe<sensor_msgs::Imu> ("/mavros/imu/data_raw", 2, cb_imu);
-  pub_pos = nh.advertise<nav_msgs::Path> ("/pos", 2);
+    ros::Subscriber sub_imu = nh.subscribe<sensor_msgs::Imu> ("/mavros/imu/data_raw", 2, cb_imu);
+    pub_pos = nh.advertise<nav_msgs::Path> ("/pos", 2);
 
-  ros::spin();
+    ros::spin();
 }
